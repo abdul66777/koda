@@ -23,56 +23,60 @@
 
   <div class="result" id="result" style="display: none;"></div>
 
-  <script>
-    async function calculate() {
-      const hashrateUser = parseFloat(document.getElementById('hashrate').value);
-      const rentalCost = parseFloat(document.getElementById('rentalCost').value);
-      const resultDiv = document.getElementById('result');
+ <script>
+  async function calculate() {
+    const hashrateUser = parseFloat(document.getElementById('hashrate').value);
+    const rentalCost = parseFloat(document.getElementById('rentalCost').value);
+    const resultDiv = document.getElementById('result');
 
-      if (isNaN(hashrateUser) || isNaN(rentalCost) || hashrateUser <= 0) {
-        alert("Mohon isi semua input dengan benar.");
+    if (isNaN(hashrateUser) || isNaN(rentalCost) || hashrateUser <= 0) {
+      alert("Mohon isi semua input dengan benar.");
+      return;
+    }
+
+    try {
+      const [priceRes, netHashRes, rewardRes] = await Promise.all([
+        fetch('https://api.k0bradag.com/price'),
+        fetch('https://api.k0bradag.com/info/hashrate'),
+        fetch('https://api.k0bradag.com/info/blockreward')
+      ]);
+
+      const priceData = await priceRes.json();
+      const netHashData = await netHashRes.json();
+      const rewardData = await rewardRes.json();
+
+      const priceUSD = parseFloat(priceData.price_usd);
+      const netHashrateMH = parseFloat(netHashData.hashrate) * 1000; // GH/s → MH/s
+      const blockReward = parseFloat(rewardData.reward ?? rewardData.block_reward ?? 0);
+      const blocksPerDay = 86400;
+
+      if (isNaN(priceUSD) || isNaN(netHashrateMH) || isNaN(blockReward)) {
+        resultDiv.innerHTML = "Gagal menghitung. Pastikan data API valid.";
+        resultDiv.style.display = 'block';
         return;
       }
 
-      try {
-        // Ambil data API
-        const [priceRes, netHashRes, rewardRes] = await Promise.all([
-          fetch('https://api.k0bradag.com/price'),
-          fetch('https://api.k0bradag.com/info/hashrate'),
-          fetch('https://api.k0bradag.com/info/blockreward')
-        ]);
+      const dailyKODA = (hashrateUser / netHashrateMH) * blockReward * blocksPerDay;
+      const dailyUSD = dailyKODA * priceUSD;
+      const profit = dailyUSD - rentalCost;
 
-        const priceData = await priceRes.json();
-        const netHashData = await netHashRes.json();
-        const rewardData = await rewardRes.json();
+      resultDiv.innerHTML = `
+        <strong>Estimasi Hasil Harian:</strong><br>
+        Network Hashrate: ${netHashrateMH.toFixed(2)} MH/s<br>
+        KODA/hari: <b>${dailyKODA.toFixed(2)}</b><br>
+        USD/hari: <b>$${dailyUSD.toFixed(4)}</b><br>
+        Profit: <b style="color:${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(4)}</b>
+      `;
+      resultDiv.style.display = 'block';
 
-        const priceUSD = parseFloat(priceData.price_usd);
-        const netHashrateMH = parseFloat(netHashData.hashrate) * 1000; // GH/s → MH/s
-        const blockReward = parseFloat(rewardData.block_reward);
-        const blocksPerDay = 86400; // 1 block per detik
-
-        // Kalkulasi
-        const dailyKODA = (hashrateUser / netHashrateMH) * blockReward * blocksPerDay;
-        const dailyUSD = dailyKODA * priceUSD;
-        const profit = dailyUSD - rentalCost;
-
-        // Tampilkan hasil
-        resultDiv.innerHTML = `
-          <strong>Estimasi Hasil Harian:</strong><br>
-          Network Hashrate: ${netHashrateMH.toFixed(2)} MH/s<br>
-          KODA/hari: <b>${dailyKODA.toFixed(2)}</b><br>
-          USD/hari: <b>$${dailyUSD.toFixed(4)}</b><br>
-          Profit: <b style="color:${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(4)}</b>
-        `;
-        resultDiv.style.display = 'block';
-
-      } catch (err) {
-        resultDiv.innerHTML = "Gagal mengambil data dari API.";
-        resultDiv.style.display = 'block';
-        console.error(err);
-      }
+    } catch (err) {
+      resultDiv.innerHTML = "Gagal mengambil data dari API.";
+      resultDiv.style.display = 'block';
+      console.error(err);
     }
-  </script>
+  }
+</script>
+
 
 </body>
 </html>
