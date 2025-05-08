@@ -1,83 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="UTF-8">
   <title>KODA Mining Calculator (Realtime)</title>
   <style>
-    body { font-family: Arial; max-width: 600px; margin: 40px auto; }
-    input, button { padding: 8px; margin: 5px 0; width: 100%; }
-    .result { background: #f4f4f4; padding: 15px; margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 8px 0;
+      width: 100%;
+      max-width: 400px;
+      font-size: 16px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f3f3f3;
+      border-left: 4px solid #ccc;
+    }
   </style>
 </head>
 <body>
-
   <h2>KODA Mining Calculator (Realtime)</h2>
+  <label>Hashrate Anda (MH/s):</label><br>
+  <input type="number" id="hashrate" placeholder="Contoh: 1000"><br>
 
-  <label>Hashrate Anda (MH/s):</label>
-  <input type="number" id="hashrate" placeholder="Contoh: 100" step="0.01">
-
-  <label>Biaya sewa per hari (USD):</label>
-  <input type="number" id="rentalCost" placeholder="Contoh: 1.5" step="0.01">
+  <label>Biaya sewa per hari (USD):</label><br>
+  <input type="number" id="rentalCost" placeholder="Contoh: 1"><br>
 
   <button onclick="calculate()">Hitung</button>
 
-  <div class="result" id="result" style="display: none;"></div>
+  <div id="result" style="display:none;"></div>
 
-<script>
-  async function calculate() {
-    const hashrateUser = parseFloat(document.getElementById('hashrate').value);
-    const rentalCost = parseFloat(document.getElementById('rentalCost').value);
-    const resultDiv = document.getElementById('result');
+  <script>
+    async function calculate() {
+      const hashrateUser = parseFloat(document.getElementById('hashrate').value);
+      const rentalCost = parseFloat(document.getElementById('rentalCost').value);
+      const resultDiv = document.getElementById('result');
 
-    if (isNaN(hashrateUser) || isNaN(rentalCost) || hashrateUser <= 0) {
-      alert("Mohon isi semua input dengan benar.");
-      return;
-    }
-
-    try {
-      const [priceRes, netHashRes, rewardRes] = await Promise.all([
-        fetch('https://api.k0bradag.com/info/price'),
-        fetch('https://api.k0bradag.com/info/hashrate'),
-        fetch('https://api.k0bradag.com/info/blockreward')
-      ]);
-
-      const priceData = await priceRes.json();       // { price: 0.00022877 }
-      const netHashData = await netHashRes.json();   // { hashrate: 0.0175191241113 }
-      const rewardData = await rewardRes.json();     // { blockreward: 4.49554166 }
-
-      const priceUSD = parseFloat(priceData.price);
-      const netHashrateMH = parseFloat(netHashData.hashrate) * 1000; // GH/s → MH/s
-      const blockReward = parseFloat(rewardData.blockreward);
-      const blocksPerDay = 86400;
-
-      if (isNaN(priceUSD) || isNaN(netHashrateMH) || isNaN(blockReward)) {
-        resultDiv.innerHTML = "Gagal menghitung. Pastikan data API valid.";
-        resultDiv.style.display = 'block';
+      if (isNaN(hashrateUser) || isNaN(rentalCost) || hashrateUser <= 0) {
+        alert("Mohon isi input dengan benar.");
         return;
       }
 
-      const dailyKODA = (hashrateUser / netHashrateMH) * blockReward * blocksPerDay;
-      const dailyUSD = dailyKODA * priceUSD;
-      const profit = dailyUSD - rentalCost;
+      try {
+        const [priceRes, netHashRes, rewardRes] = await Promise.all([
+          fetch('https://api.k0bradag.com/info/price'),
+          fetch('https://api.k0bradag.com/info/hashrate'),
+          fetch('https://api.k0bradag.com/info/blockreward')
+        ]);
 
-      resultDiv.innerHTML = `
-        <strong>Estimasi Hasil Harian:</strong><br>
-        Network Hashrate: ${netHashrateMH.toFixed(2)} MH/s<br>
-        KODA/hari: <b>${dailyKODA.toFixed(2)}</b><br>
-        USD/hari: <b>$${dailyUSD.toFixed(4)}</b><br>
-        Profit: <b style="color:${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(4)}</b>
-      `;
-      resultDiv.style.display = 'block';
+        const priceData = await priceRes.json();       // { price: ... }
+        const netHashData = await netHashRes.json();   // { hashrate: ... } (TH/s)
+        const rewardData = await rewardRes.json();     // { blockreward: ... }
 
-    } catch (err) {
-      resultDiv.innerHTML = "Gagal mengambil data dari API.";
-      resultDiv.style.display = 'block';
-      console.error(err);
+        const priceUSD = parseFloat(priceData.price);
+        const netHashrateTH = parseFloat(netHashData.hashrate);         // TH/s
+        const netHashrateMH = netHashrateTH * 1_000_000;                // MH/s
+        const netHashrateGH = netHashrateTH * 1_000;                    // GH/s
+        const blockReward = parseFloat(rewardData.blockreward);
+        const blocksPerDay = 86400;
+
+        if (isNaN(priceUSD) || isNaN(netHashrateMH) || isNaN(blockReward)) {
+          resultDiv.innerHTML = "Gagal menghitung. Pastikan data API valid.";
+          resultDiv.style.display = 'block';
+          return;
+        }
+
+        const dailyKODA = (hashrateUser / netHashrateMH) * blockReward * blocksPerDay;
+        const dailyUSD = dailyKODA * priceUSD;
+        const profit = dailyUSD - rentalCost;
+
+        resultDiv.innerHTML = `
+          <strong>Estimasi Hasil Harian:</strong><br>
+          Network Hashrate: ${netHashrateGH.toFixed(2)} GH/s<br>
+          KODA/hari: <b>${dailyKODA.toFixed(4)}</b><br>
+          USD/hari: <b>$${dailyUSD.toFixed(4)}</b><br>
+          Profit: <b style="color:${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(4)}</b>
+        `;
+        resultDiv.style.display = 'block';
+
+      } catch (err) {
+        resultDiv.innerHTML = "Gagal mengambil data dari API.";
+        resultDiv.style.display = 'block';
+        console.error(err);
+      }
     }
-  }
-</script>
-
-
-
+  </script>
 </body>
 </html>
