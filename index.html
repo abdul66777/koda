@@ -23,7 +23,7 @@
 
   <div class="result" id="result" style="display: none;"></div>
 
- <script>
+<script>
   async function calculate() {
     const hashrateUser = parseFloat(document.getElementById('hashrate').value);
     const rentalCost = parseFloat(document.getElementById('rentalCost').value);
@@ -36,18 +36,18 @@
 
     try {
       const [priceRes, netHashRes, rewardRes] = await Promise.all([
-        fetch('https://api.k0bradag.com/price'),
+        fetch('https://api.k0bradag.com/info/price'),
         fetch('https://api.k0bradag.com/info/hashrate'),
         fetch('https://api.k0bradag.com/info/blockreward')
       ]);
 
-      const priceData = await priceRes.json();
-      const netHashData = await netHashRes.json();
-      const rewardData = await rewardRes.json();
+      const priceData = await priceRes.json();       // { price: 0.00022877 }
+      const netHashData = await netHashRes.json();   // { hashrate: 0.0175191241113 }
+      const rewardData = await rewardRes.json();     // { blockreward: 4.49554166 }
 
-      const priceUSD = parseFloat(priceData.price_usd);
+      const priceUSD = parseFloat(priceData.price);
       const netHashrateMH = parseFloat(netHashData.hashrate) * 1000; // GH/s → MH/s
-      const blockReward = parseFloat(rewardData.reward ?? rewardData.block_reward ?? 0);
+      const blockReward = parseFloat(rewardData.blockreward);
       const blocksPerDay = 86400;
 
       if (isNaN(priceUSD) || isNaN(netHashrateMH) || isNaN(blockReward)) {
@@ -76,6 +76,7 @@
     }
   }
 </script>
+
 
 
 </body>
