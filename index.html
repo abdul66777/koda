@@ -21,15 +21,65 @@
       background-color: #f3f3f3;
       border-left: 4px solid #ccc;
     }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px; width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0;
+    }
   </style>
 </head>
 <body>
   <h2>KODA Mining Calculator (Realtime)</h2>
+
   <label>Hashrate Anda (MH/s):</label><br>
   <input type="number" id="hashrate" placeholder="Contoh: 1000"><br>
 
   <label>Biaya sewa per hari (USD):</label><br>
   <input type="number" id="rentalCost" placeholder="Contoh: 1"><br>
+
+  <div class="toggle-container">
+    <label class="switch">
+      <input type="checkbox" id="addToNetwork">
+      <span class="slider"></span>
+    </label>
+    <span>Tambahkan hashrate ke network</span>
+  </div>
 
   <button onclick="calculate()">Hitung</button>
 
@@ -39,6 +89,7 @@
     async function calculate() {
       const hashrateUser = parseFloat(document.getElementById('hashrate').value);
       const rentalCost = parseFloat(document.getElementById('rentalCost').value);
+      const addToNetwork = document.getElementById('addToNetwork').checked;
       const resultDiv = document.getElementById('result');
 
       if (isNaN(hashrateUser) || isNaN(rentalCost) || hashrateUser <= 0) {
@@ -53,30 +104,37 @@
           fetch('https://api.k0bradag.com/info/blockreward')
         ]);
 
-        const priceData = await priceRes.json();       // { price: ... }
-        const netHashData = await netHashRes.json();   // { hashrate: ... } (TH/s)
-        const rewardData = await rewardRes.json();     // { blockreward: ... }
+        const priceData = await priceRes.json();
+        const netHashData = await netHashRes.json();
+        const rewardData = await rewardRes.json();
 
         const priceUSD = parseFloat(priceData.price);
-        const netHashrateTH = parseFloat(netHashData.hashrate);         // TH/s
-        const netHashrateMH = netHashrateTH * 1_000_000;                // MH/s
-        const netHashrateGH = netHashrateTH * 1_000;                    // GH/s
+        const netHashrateTH = parseFloat(netHashData.hashrate); // TH/s
+        const realNetHashrateMH = netHashrateTH * 1_000_000;
         const blockReward = parseFloat(rewardData.blockreward);
         const blocksPerDay = 86400;
 
-        if (isNaN(priceUSD) || isNaN(netHashrateMH) || isNaN(blockReward)) {
-          resultDiv.innerHTML = "Gagal menghitung. Pastikan data API valid.";
-          resultDiv.style.display = 'block';
-          return;
+        let totalHashrateMH = realNetHashrateMH;
+        if (addToNetwork) {
+          totalHashrateMH += hashrateUser;
         }
 
-        const dailyKODA = (hashrateUser / netHashrateMH) * blockReward * blocksPerDay;
+        const realNetHashrateGH = realNetHashrateMH / 1000;
+        const totalHashrateGH = totalHashrateMH / 1000;
+
+        const dailyKODA = (hashrateUser / totalHashrateMH) * blockReward * blocksPerDay;
         const dailyUSD = dailyKODA * priceUSD;
         const profit = dailyUSD - rentalCost;
 
+        let networkText = `Network Hashrate: ${realNetHashrateGH.toFixed(2)} GH/s`;
+        if (addToNetwork) {
+          const userHashGH = (hashrateUser / 1000).toFixed(2);
+          networkText += ` + ${userHashGH} GH/s = ${totalHashrateGH.toFixed(2)} GH/s`;
+        }
+
         resultDiv.innerHTML = `
           <strong>Estimasi Hasil Harian:</strong><br>
-          Network Hashrate: ${netHashrateGH.toFixed(2)} GH/s<br>
+          ${networkText}<br>
           KODA/hari: <b>${dailyKODA.toFixed(4)}</b><br>
           USD/hari: <b>$${dailyUSD.toFixed(4)}</b><br>
           Profit: <b style="color:${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(4)}</b>
